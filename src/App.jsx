@@ -643,3 +643,74 @@ For FOLLOW-UP responses: If they engage further or give longer answers, you can 
                 value={formData.name}
                 onChange={(e) => setFormData({...formData, name: e.target.value})}
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+<div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Date & Time*
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <input
+              type="date"
+              value={formData.date}
+              onChange={(e) => setFormData({...formData, date: e.target.value})}
+              className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+            />
+            <input
+              type="time"
+              value={formData.time}
+              onChange={(e) => setFormData({...formData, time: e.target.value})}
+              className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Type*
+          </label>
+          <select
+            value={formData.type}
+            onChange={(e) => setFormData({...formData, type: e.target.value})}
+            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value="Social">Social</option>
+            <option value="Professional">Professional</option>
+            <option value="Networking">Networking</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Location
+          </label>
+          <input
+            type="text"
+            value={formData.location}
+            onChange={(e) => setFormData({...formData, location: e.target.value})}
+            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+            placeholder="Office Cafeteria"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            One small goal (optional)
+          </label>
+          <input
+            type="text"
+            value={formData.goal}
+            onChange={(e) => setFormData({...formData, goal: e.target.value})}
+            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+            placeholder="Ask one question during lunch"
+          />
+        </div>
+
+        <button
+          onClick={handleSubmit}
+          className="w-full bg-indigo-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-indigo-700"
+        >
+          Save Event
+        </button>
+      </div>
+    </div>
+  </div>
+);
