@@ -310,9 +310,21 @@ For FOLLOW-UP responses: If they engage further or give longer answers, you can 
   if (currentReflection.eventId) {
     setCompletedEventIds([...completedEventIds, currentReflection.eventId]);
   }
+
+  setReflections([newReflection, ...reflections]);
+  
+  // Manually save to localStorage
+  const updatedReflections = [newReflection, ...reflections];
+  localStorage.setItem('wabi_reflections', JSON.stringify(updatedReflections));
+  
+  if (currentReflection.eventId) {
+    setCompletedEventIds([...completedEventIds, currentReflection.eventId]);
+    const updatedCompleted = [...completedEventIds, currentReflection.eventId];
+    localStorage.setItem('wabi_completed', JSON.stringify(updatedCompleted));
+  }
   
   setCurrentScreen('home');
-  setCurrentReflection(null);
+  setCurrentReflection(null);  
 };
   
   const newReflection = {
