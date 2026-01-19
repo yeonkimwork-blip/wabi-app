@@ -225,7 +225,13 @@ For FOLLOW-UP responses: If they engage further or give longer answers, you can 
       setConversationStep(prev => prev + 1);
     };
 
-    const saveReflection = () => {
+  const saveReflection = () => {
+  // Safety check
+  if (!selectedEmotion) {
+    alert('Please select how you felt before saving');
+    return;
+  }
+  
   const firstAIMessage = aiMessages.find(msg => msg.type === 'ai')?.content || '';
   const highlights = firstAIMessage
     .split('\n')
@@ -284,6 +290,30 @@ For FOLLOW-UP responses: If they engage further or give longer answers, you can 
     emotionBg = 'bg-gray-100';
     emotionBorder = 'border-gray-300';
   }
+  
+  const newReflection = {
+    id: Date.now(), // Use timestamp for unique IDs
+    eventName: currentReflection.eventName,
+    date: new Date().toLocaleDateString(),
+    emotion: selectedEmotion.emoji,
+    emotionBg: emotionBg,
+    emotionBorder: emotionBorder,
+    snippet: reflectionText.slice(0, 40) + '...',
+    fullReflection: reflectionText,
+    aiHighlights: highlights.length > 0 ? highlights : ['You showed up', 'You participated'],
+    comfortLevel: selectedEmotion.label,
+    goalForNext: goalForNext
+  };
+  
+  setReflections([newReflection, ...reflections]);
+  
+  if (currentReflection.eventId) {
+    setCompletedEventIds([...completedEventIds, currentReflection.eventId]);
+  }
+  
+  setCurrentScreen('home');
+  setCurrentReflection(null);
+};
   
   const newReflection = {
     id: reflections.length + 1,
