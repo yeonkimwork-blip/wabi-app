@@ -203,21 +203,74 @@ For FOLLOW-UP responses: If they engage further or give longer answers, you can 
     .filter(line => line.trim().length > 0 && !line.includes('?'))
     .slice(0, 3);
   
+  // Find the goal from the conversation
   let goalForNext = 'Continue building social confidence';
-  const userMessages = aiMessages.filter(msg => msg.type === 'user').map(msg => msg.content);
   
-  for (const msg of userMessages) {
-    const lowerMsg = msg.toLowerCase();
-    if (lowerMsg.includes('next time') || lowerMsg.includes('try to') || lowerMsg.includes('want to') || 
-        lowerMsg.includes('will') || lowerMsg.includes('goal') || lowerMsg.includes('plan to')) {
-      goalForNext = msg;
-      break;
+  // Look for Wabi's suggestions about goals
+  const allAIMessages = aiMessages.filter(msg => msg.type === 'ai');
+  for (const msg of allAIMessages) {
+    const content = msg.content.toLowerCase();
+    // Look for sentences where Wabi suggests or acknowledges a goal
+    if (content.includes('that sounds like') || content.includes('meaningful goal') || 
+        content.includes('great goal') || content.includes('small steps')) {
+      // This is Wabi's response to the user's goal - extract the user's previous message
+      const msgIndex = aiMessages.indexOf(msg);
+      if (msgIndex > 0 && aiMessages[msgIndex - 1].type === 'user') {
+        goalForNext = aiMessages[msgIndex - 1].content;
+        break;
+      }
     }
   }
   
-  if (goalForNext === 'Continue building social confidence' && userMessages.length > 0) {
-    goalForNext = userMessages[userMessages.length - 1];
+  // If no explicit goal found, look for user messages with goal keywords
+  if (goalForNext === 'Continue building social confidence') {
+    const userMessages = aiMessages.filter(msg => msg.type === 'user');
+    for (const msg of userMessages.map(m => m.content)) {
+      const lowerMsg = msg.toLowerCase();
+      if (lowerMsg.includes('next time') || lowerMsg.includes('try to') || lowerMsg.includes('want to') || 
+          lowerMsg.includes('will') || lowerMsg.includes('goal') || lowerMsg.includes('plan to')) {
+        goalForNext = msg;
+        break;
+      }
+    }
   }
+  
+  // Clean up the goal - remove fluff, keep it concise
+  goalForNext = goalForNext.trim();
+  if (goalForNext.toLowerCase().startsWith('i ')) {
+    goalForNext = goalForNext.substring(2); // Remove "I " from start
+  }
+  if (goalForNext.length > 150) {
+    goalForNext = goalForNext.substring(0, 147) + '...';
+  }
+  // Capitalize first letter
+  goalForNext = goalForNext.charAt(0).toUpperCase() + goalForNext.slice(1);
+  
+  const newReflection = {
+    id: reflections.length + 1,
+    eventName: currentReflection.eventName,
+    date: new Date().toLocaleDateString(),
+    emotion: selectedEmotion.emoji,
+    emotionBg: selectedEmotion.selected.includes('red') ? 'bg-red-100' : 
+              selectedEmotion.selected.includes('green') ? 'bg-green-100' : 'bg-gray-100',
+    emotionBorder: selectedEmotion.selected.includes('red') ? 'border-red-300' : 
+                  selectedEmotion.selected.includes('green') ? 'border-green-300' : 'border-gray-300',
+    snippet: reflectionText.slice(0, 40) + '...',
+    fullReflection: reflectionText,
+    aiHighlights: highlights.length > 0 ? highlights : ['You showed up', 'You participated'],
+    comfortLevel: selectedEmotion.label,
+    goalForNext: goalForNext
+  };
+  
+  setReflections([newReflection, ...reflections]);
+  
+  if (currentReflection.eventId) {
+    setCompletedEventIds([...completedEventIds, currentReflection.eventId]);
+  }
+  
+  setCurrentScreen('home');
+  setCurrentReflection(null);
+};
   
   const newReflection = {
     id: reflections.length + 1,
