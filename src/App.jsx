@@ -122,57 +122,48 @@ function App() {
   await new Promise(resolve => setTimeout(resolve, thinkingDelay));
   
   try {
-    // Smart mock responses based on context
-    let aiResponse = '';
-    
-    if (conversationHistory.length === 0) {
-      // First response - acknowledge and ask about goals
-      const reflectionLower = reflection.toLowerCase();
-      let positive = '';
-      
-      if (reflectionLower.includes('question') || reflectionLower.includes('ask')) {
-        positive = "asking a question";
-      } else if (reflectionLower.includes('listen') || reflectionLower.includes('heard')) {
-        positive = "actively listening";
-      } else if (reflectionLower.includes('speak') || reflectionLower.includes('said') || reflectionLower.includes('talk')) {
-        positive = "contributing to the conversation";
-      } else if (reflectionLower.includes('stay') || reflectionLower.includes('remained')) {
-        positive = "staying engaged";
-      } else {
-        positive = "showing up";
-      }
-      
-      if (emotion?.label === 'Uncomfortable') {
-        aiResponse = `I notice you felt uncomfortable, but you still succeeded in ${positive}—that takes real courage. Would you like to set a small goal for next time?`;
-      } else if (emotion?.label === 'Comfortable') {
-        aiResponse = `It's great that you felt comfortable while ${positive}! Would you like to set a small goal to build on this success?`;
-      } else {
-        aiResponse = `I see you felt neutral about the experience, and ${positive} shows you're making progress. Would you like to set a small goal for next time?`;
-      }
-    } else {
-      // Follow-up responses based on user's message
-      const lastUserMsg = conversationHistory[conversationHistory.length - 1].content.toLowerCase();
-      
-      if (lastUserMsg.includes('yes') || lastUserMsg.includes('yeah') || lastUserMsg.includes('sure') || 
-          lastUserMsg.includes('next time') || lastUserMsg.includes('try to') || lastUserMsg.includes('want to')) {
-        aiResponse = "That sounds like a meaningful goal! Small steps like this really add up over time. Remember, progress isn't always linear—some days will feel easier than others, and that's completely normal.";
-      } else if (lastUserMsg.includes('no') || lastUserMsg.includes('not sure') || lastUserMsg.includes('don\'t know')) {
-        aiResponse = "That's okay! Sometimes just reflecting on the experience is enough. You can always set a goal later when something feels right. How did this event compare to similar ones in the past?";
-      } else if (lastUserMsg.length < 20) {
-        // Short response, keep it brief
-        aiResponse = "I appreciate you sharing that. Every social interaction teaches us something, even the challenging ones.";
-      } else {
-        // Longer, more detailed response
-        aiResponse = "Thank you for sharing more about your experience. It sounds like you're really paying attention to how these situations affect you, which is a valuable skill. That kind of self-awareness is the first step toward feeling more comfortable in social settings.";
-      }
+    const systemPrompt = `You are Wabi, a warm, supportive AI companion for introverts reflecting on social events.
+
+The person just attended: ${currentReflection?.eventName}
+They felt: ${emotion?.label || 'uncertain'}
+Their reflection: "${reflection}"
+
+IMPORTANT: Keep your FIRST response very brief (1-2 sentences max). Acknowledge one specific positive thing they did, then simply ask: "Would you like to set a small goal for next time?"
+
+For FOLLOW-UP responses: If they engage further or give longer answers, you can be more conversational and ask deeper questions. Match their energy level - short answers get short responses, longer answers get more thoughtful engagement.`;
+
+    const messages = conversationHistory.length > 0 
+      ? conversationHistory 
+      : [{ role: "user", content: systemPrompt }];
+
+    // Call our backend API instead of Anthropic directly
+    const response = await fetch("/api/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1000,
+        messages: messages,
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error("API Error:", errorData);
+      throw new Error('API request failed');
     }
+
+    const data = await response.json();
+    const aiResponse = data.content.find(block => block.type === "text")?.text || "I'm here to support you.";
     
     setIsAITyping(false);
     return aiResponse;
   } catch (error) {
-    console.error("Mock AI Error:", error);
+    console.error("AI Error:", error);
     setIsAITyping(false);
-    return "I'm here to support you. How did the event make you feel?";
+    return "I'm having trouble connecting right now, but I'm here for you. Could you tell me more about your experience?";
   }
 };
 
