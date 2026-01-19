@@ -1,13 +1,44 @@
 import React, { useState, useEffect } from 'react';
 import { Home, Calendar, ArrowLeft, Plus, Clock, MapPin, Target, ChevronRight, Send, Eye } from 'lucide-react';
 
-function App() {
+  function App() {
   const [currentScreen, setCurrentScreen] = useState('home');
   const [events, setEvents] = useState([]);
   const [reflections, setReflections] = useState([]);
   const [currentReflection, setCurrentReflection] = useState(null);
   const [selectedReflectionId, setSelectedReflectionId] = useState(null);
   const [completedEventIds, setCompletedEventIds] = useState([]);
+
+  // ADD THE LOCALSTORAGE CODE HERE
+  useEffect(() => {
+    const savedReflections = localStorage.getItem('wabi_reflections');
+    const savedEvents = localStorage.getItem('wabi_events');
+    const savedCompleted = localStorage.getItem('wabi_completed');
+    
+    if (savedReflections) setReflections(JSON.parse(savedReflections));
+    if (savedEvents) setEvents(JSON.parse(savedEvents));
+    if (savedCompleted) setCompletedEventIds(JSON.parse(savedCompleted));
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('wabi_reflections', JSON.stringify(reflections));
+  }, [reflections]);
+
+  useEffect(() => {
+    localStorage.setItem('wabi_events', JSON.stringify(events));
+  }, [events]);
+
+  useEffect(() => {
+    localStorage.setItem('wabi_completed', JSON.stringify(completedEventIds));
+  }, [completedEventIds]);
+
+  // THEN YOUR EXISTING useEffect WITH SAMPLE DATA
+  useEffect(() => {
+    const sampleEvents = [
+      {
+        id: 1,
+        name: 'Team Lunch',
+        // ... rest of sample data
 
   useEffect(() => {
     const sampleEvents = [{id: 1, name: 'Team Lunch', date: '2025-06-03', time: '12:00 PM', type: 'Social', location: 'Office Cafeteria', goal: 'Ask one question', typeColor: 'bg-indigo-100 text-indigo-600'}];
