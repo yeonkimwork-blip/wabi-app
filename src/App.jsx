@@ -237,22 +237,17 @@ For FOLLOW-UP responses: If they engage further or give longer answers, you can 
   
   const userMessages = aiMessages.filter(msg => msg.type === 'user');
   
-  // Find the most substantial user message that contains a goal
   for (const msg of userMessages.map(m => m.content)) {
     const lowerMsg = msg.toLowerCase().trim();
     
-    // Skip short agreement responses
     if (msg.length < 15) continue;
     if (lowerMsg === 'yes' || lowerMsg === 'yeah' || lowerMsg === 'sure' || 
         lowerMsg === 'okay' || lowerMsg === 'ok' || lowerMsg === 'no') continue;
     
-    // This is likely the goal statement
     goalForNext = msg;
     
-    // Clean it up
     let cleaned = goalForNext.trim();
     
-    // Remove common prefixes
     const prefixes = [
       'i want to ', 'i will ', "i'll ", 'i would like to ',
       'next time i will ', 'next time i want to ', "next time i'll ",
@@ -267,17 +262,52 @@ For FOLLOW-UP responses: If they engage further or give longer answers, you can 
       }
     }
     
-    // Capitalize first letter
     cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
     
-    // Limit length
     if (cleaned.length > 120) {
       cleaned = cleaned.substring(0, 117) + '...';
     }
     
     goalForNext = cleaned;
-    break; // Use the first substantial message
+    break;
   }
+  
+  // Determine emotion background/border based on emoji
+  let emotionBg, emotionBorder;
+  if (selectedEmotion.emoji === '😔') {
+    emotionBg = 'bg-red-100';
+    emotionBorder = 'border-red-300';
+  } else if (selectedEmotion.emoji === '🙂') {
+    emotionBg = 'bg-green-100';
+    emotionBorder = 'border-green-300';
+  } else {
+    emotionBg = 'bg-gray-100';
+    emotionBorder = 'border-gray-300';
+  }
+  
+  const newReflection = {
+    id: reflections.length + 1,
+    eventName: currentReflection.eventName,
+    date: new Date().toLocaleDateString(),
+    emotion: selectedEmotion.emoji,
+    emotionBg: emotionBg,
+    emotionBorder: emotionBorder,
+    snippet: reflectionText.slice(0, 40) + '...',
+    fullReflection: reflectionText,
+    aiHighlights: highlights.length > 0 ? highlights : ['You showed up', 'You participated'],
+    comfortLevel: selectedEmotion.label,
+    goalForNext: goalForNext
+  };
+  
+  setReflections([newReflection, ...reflections]);
+  
+  if (currentReflection.eventId) {
+    setCompletedEventIds([...completedEventIds, currentReflection.eventId]);
+  }
+  
+  setCurrentScreen('home');
+  setCurrentReflection(null);
+};
   
   const newReflection = {
     id: reflections.length + 1,
