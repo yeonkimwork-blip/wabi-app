@@ -197,109 +197,53 @@ For FOLLOW-UP responses: If they engage further or give longer answers, you can 
     };
 
     const saveReflection = () => {
-      const firstAIMessage = aiMessages.find(msg => msg.type === 'ai')?.content || '';
-      const highlights = firstAIMessage.split('\n').filter(line => line.trim().length > 0 && !line.includes('?')).slice(0, 3);
-      let goalForNext = 'Continue building social confidence';
-      const userMessages = aiMessages.filter(msg => msg.type === 'user').map(msg => msg.content);
-      for (const msg of userMessages) {
-        const lowerMsg = msg.toLowerCase();
-        if (lowerMsg.includes('next time') || lowerMsg.includes('try to') || lowerMsg.includes('want to') || lowerMsg.includes('will') || lowerMsg.includes('goal') || lowerMsg.includes('plan to')) {
-          goalForNext = msg;
-          break;
-        }
-      }
-      if (goalForNext === 'Continue building social confidence' && userMessages.length > 0) goalForNext = userMessages[userMessages.length - 1];
-      const newReflection = {
-        id: reflections.length + 1,
-        eventName: currentReflection.eventName,
-        date: new Date().toLocaleDateString(),
-        emotion: selectedEmotion.emoji,
-        emotionBg: selectedEmotion.selected.includes('red') ? 'bg-red-100' : selectedEmotion.selected.includes('green') ? 'bg-green-100' : 'bg-gray-100',
-        emotionBorder: selectedEmotion.selected.includes('red') ? 'border-red-300' : selectedEmotion.selected.includes('green') ? 'border-green-300' : 'border-gray-300',
-        snippet: reflectionText.slice(0, 40) + '...',
-        fullReflection: reflectionText,
-        aiHighlights: highlights.length > 0 ? highlights : ['You showed up', 'You participated'],
-        comfortLevel: selectedEmotion.label,
-        goalForNext: goalForNext
-      };
-      setReflections([newReflection, ...reflections]);
-      if (currentReflection.eventId) setCompletedEventIds([...completedEventIds, currentReflection.eventId]);
-      setCurrentScreen('home');
-      setCurrentReflection(null);
-    };
-
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="bg-indigo-600 px-6 py-8 text-white">
-          <div className="flex items-center mb-4">
-            <button onClick={() => setCurrentScreen('home')} className="mr-4"><ArrowLeft size={24} className="text-white" /></button>
-            <h1 className="text-xl font-bold">Event Reflection</h1>
-          </div>
-          <div><h2 className="text-lg font-semibold">{currentReflection?.eventName}</h2><p className="text-indigo-200 text-sm">{formatDate(currentReflection?.date)} • {currentReflection?.time}</p></div>
-        </div>
-        <div className="px-6 py-6 space-y-6">
-          {!showAIResponse ? (
-            <>
-              <div className="bg-white rounded-lg p-5 border border-gray-200 shadow-sm">
-                <h3 className="text-lg font-semibold text-gray-800 mb-3">How did your event go?</h3>
-                <textarea value={reflectionText} onChange={(e) => setReflectionText(e.target.value)} className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 h-32 resize-none" placeholder="" />
-              </div>
-              <div className="bg-white rounded-lg p-5 border border-gray-200 shadow-sm">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">How comfortable did you feel?</h3>
-                <div className="grid grid-cols-3 gap-3">
-                  {emotions.map((emotion) => (
-                    <button key={emotion.emoji} onClick={() => setSelectedEmotion(emotion)} className={`p-4 border-2 rounded-lg text-center transition-all ${selectedEmotion?.emoji === emotion.emoji ? emotion.selected : `${emotion.bg} ${emotion.border}`}`}>
-                      <div className="text-2xl mb-1">{emotion.emoji}</div>
-                      <div className="text-xs font-medium text-gray-600">{emotion.label}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <button onClick={handleInitialSubmit} disabled={isSubmitting} className="w-full bg-indigo-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-indigo-700 disabled:bg-indigo-400 disabled:cursor-not-allowed transition-colors shadow-sm">{isSubmitting ? 'Sending to Wabi...' : 'Submit Reflection'}</button>
-            </>
-          ) : (
-            <>
-              <div className="bg-white rounded-lg p-5 border border-gray-200 shadow-sm">
-                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Conversation with Wabi</h3>
-                <div className="space-y-4">
-                  {aiMessages.map((message, index) => (
-                    <div key={index} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[85%] px-4 py-3 rounded-lg ${message.type === 'ai' ? 'bg-indigo-50 border border-indigo-200' : 'bg-gray-100'}`}>
-                        {message.type === 'ai' && (<div className="flex items-center mb-2"><div className="w-6 h-6 bg-indigo-600 rounded-full flex items-center justify-center mr-2"><span className="text-white text-xs font-bold">W</span></div><span className="text-indigo-700 font-semibold text-sm">Wabi</span></div>)}
-                        <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-line">{message.content}</p>
-                      </div>
-                    </div>
-                  ))}
-                  {isAITyping && (
-                    <div className="flex justify-start">
-                      <div className="px-4 py-3 rounded-lg bg-indigo-50 border border-indigo-200">
-                        <div className="flex items-center mb-2"><div className="w-6 h-6 bg-indigo-600 rounded-full flex items-center justify-center mr-2"><span className="text-white text-xs font-bold">W</span></div><span className="text-indigo-700 font-semibold text-sm">Wabi</span></div>
-                        <div className="flex space-x-1">
-                          <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce"></div>
-                          <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
-                          <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-              {!isAITyping && aiMessages.length > 0 && (
-                <div className="bg-white rounded-lg p-5 border border-gray-200 shadow-sm space-y-3">
-                  <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Continue the conversation</h3>
-                  <div className="flex space-x-2">
-                    <input type="text" value={userResponse} onChange={(e) => setUserResponse(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleUserResponse()} className="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Share your thoughts..." />
-                    <button onClick={handleUserResponse} className="bg-indigo-600 text-white p-3 rounded-lg hover:bg-indigo-700"><Send size={20} /></button>
-                  </div>
-                  <button onClick={saveReflection} className="w-full bg-green-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-green-700">Save & Return Home</button>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </div>
-    );
+  const firstAIMessage = aiMessages.find(msg => msg.type === 'ai')?.content || '';
+  const highlights = firstAIMessage
+    .split('\n')
+    .filter(line => line.trim().length > 0 && !line.includes('?'))
+    .slice(0, 3);
+  
+  let goalForNext = 'Continue building social confidence';
+  const userMessages = aiMessages.filter(msg => msg.type === 'user').map(msg => msg.content);
+  
+  for (const msg of userMessages) {
+    const lowerMsg = msg.toLowerCase();
+    if (lowerMsg.includes('next time') || lowerMsg.includes('try to') || lowerMsg.includes('want to') || 
+        lowerMsg.includes('will') || lowerMsg.includes('goal') || lowerMsg.includes('plan to')) {
+      goalForNext = msg;
+      break;
+    }
+  }
+  
+  if (goalForNext === 'Continue building social confidence' && userMessages.length > 0) {
+    goalForNext = userMessages[userMessages.length - 1];
+  }
+  
+  const newReflection = {
+    id: reflections.length + 1,
+    eventName: currentReflection.eventName,
+    date: new Date().toLocaleDateString(),
+    emotion: selectedEmotion.emoji,
+    emotionBg: selectedEmotion.selected.includes('red') ? 'bg-red-100' : 
+              selectedEmotion.selected.includes('green') ? 'bg-green-100' : 'bg-gray-100',
+    emotionBorder: selectedEmotion.selected.includes('red') ? 'border-red-300' : 
+                  selectedEmotion.selected.includes('green') ? 'border-green-300' : 'border-gray-300',
+    snippet: reflectionText.slice(0, 40) + '...',
+    fullReflection: reflectionText,
+    aiHighlights: highlights.length > 0 ? highlights : ['You showed up', 'You participated'],
+    comfortLevel: selectedEmotion.label,
+    goalForNext: goalForNext
   };
+  
+  setReflections([newReflection, ...reflections]);
+  
+  if (currentReflection.eventId) {
+    setCompletedEventIds([...completedEventIds, currentReflection.eventId]);
+  }
+  
+  setCurrentScreen('home');
+  setCurrentReflection(null);
+};
 
   const ViewReflectionScreen = () => {
     const reflection = reflections.find(r => r.id === selectedReflectionId);
