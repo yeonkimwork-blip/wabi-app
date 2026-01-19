@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Home, Calendar, ArrowLeft, Plus, Clock, MapPin, Target, ChevronRight, Send, Eye } from 'lucide-react';
 
-  function App() {
+function App() {
   const [currentScreen, setCurrentScreen] = useState('home');
   const [events, setEvents] = useState([]);
   const [reflections, setReflections] = useState([]);
@@ -9,7 +9,7 @@ import { Home, Calendar, ArrowLeft, Plus, Clock, MapPin, Target, ChevronRight, S
   const [selectedReflectionId, setSelectedReflectionId] = useState(null);
   const [completedEventIds, setCompletedEventIds] = useState([]);
 
-  // ADD THE LOCALSTORAGE CODE HERE
+  // Load data from localStorage on mount
   useEffect(() => {
     const savedReflections = localStorage.getItem('wabi_reflections');
     const savedEvents = localStorage.getItem('wabi_events');
@@ -20,31 +20,29 @@ import { Home, Calendar, ArrowLeft, Plus, Clock, MapPin, Target, ChevronRight, S
     if (savedCompleted) setCompletedEventIds(JSON.parse(savedCompleted));
   }, []);
 
+  // Save reflections whenever they change
   useEffect(() => {
     localStorage.setItem('wabi_reflections', JSON.stringify(reflections));
   }, [reflections]);
 
+  // Save events whenever they change
   useEffect(() => {
     localStorage.setItem('wabi_events', JSON.stringify(events));
   }, [events]);
 
+  // Save completed IDs whenever they change
   useEffect(() => {
     localStorage.setItem('wabi_completed', JSON.stringify(completedEventIds));
   }, [completedEventIds]);
 
-  // THEN YOUR EXISTING useEffect WITH SAMPLE DATA
-  useEffect(() => {
-    const sampleEvents = [
-      {
-        id: 1,
-        name: 'Team Lunch',
-        // ... rest of sample data
-
+  // Sample data - only loads if no saved data exists
   useEffect(() => {
     const sampleEvents = [{id: 1, name: 'Team Lunch', date: '2025-06-03', time: '12:00 PM', type: 'Social', location: 'Office Cafeteria', goal: 'Ask one question', typeColor: 'bg-indigo-100 text-indigo-600'}];
     const sampleReflections = [{id: 1, eventName: 'Team Meeting', date: '2025-05-30', emotion: '😔', emotionBg: 'bg-red-100', emotionBorder: 'border-red-300', snippet: 'Spoke up once during discussion...', fullReflection: 'It was challenging but I managed to speak up once.', aiHighlights: ['You voiced your concerns', 'You stayed engaged'], comfortLevel: 'Uncomfortable', goalForNext: 'Try to speak up twice next time'}];
-    setEvents(sampleEvents);
-    setReflections(sampleReflections);
+    
+    // Only set sample data if nothing is saved
+    if (reflections.length === 0) setReflections(sampleReflections);
+    if (events.length === 0) setEvents(sampleEvents);
   }, []);
 
   const getNextEvent = () => {
