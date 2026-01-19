@@ -203,48 +203,78 @@ For FOLLOW-UP responses: If they engage further or give longer answers, you can 
     .filter(line => line.trim().length > 0 && !line.includes('?'))
     .slice(0, 3);
   
-  // Find the goal from the conversation
+  // Extract the actual goal statement from user messages
   let goalForNext = 'Continue building social confidence';
   
-  // Look for Wabi's suggestions about goals
-  const allAIMessages = aiMessages.filter(msg => msg.type === 'ai');
-  for (const msg of allAIMessages) {
-    const content = msg.content.toLowerCase();
-    // Look for sentences where Wabi suggests or acknowledges a goal
-    if (content.includes('that sounds like') || content.includes('meaningful goal') || 
-        content.includes('great goal') || content.includes('small steps')) {
-      // This is Wabi's response to the user's goal - extract the user's previous message
-      const msgIndex = aiMessages.indexOf(msg);
-      if (msgIndex > 0 && aiMessages[msgIndex - 1].type === 'user') {
-        goalForNext = aiMessages[msgIndex - 1].content;
+  const userMessages = aiMessages.filter(msg => msg.type === 'user');
+  
+  // Find the most substantial user message that contains a goal
+  for (const msg of userMessages.map(m => m.content)) {
+    const lowerMsg = msg.toLowerCase().trim();
+    
+    // Skip short agreement responses
+    if (msg.length < 15) continue;
+    if (lowerMsg === 'yes' || lowerMsg === 'yeah' || lowerMsg === 'sure' || 
+        lowerMsg === 'okay' || lowerMsg === 'ok' || lowerMsg === 'no') continue;
+    
+    // This is likely the goal statement
+    goalForNext = msg;
+    
+    // Clean it up
+    let cleaned = goalForNext.trim();
+    
+    // Remove common prefixes
+    const prefixes = [
+      'i want to ', 'i will ', "i'll ", 'i would like to ',
+      'next time i will ', 'next time i want to ', "next time i'll ",
+      'i think i will ', 'i plan to ', 'maybe i can ', 'i can try to ',
+      'i could ', 'try to '
+    ];
+    
+    for (const prefix of prefixes) {
+      if (cleaned.toLowerCase().startsWith(prefix)) {
+        cleaned = cleaned.substring(prefix.length);
         break;
       }
     }
-  }
-  
-  // If no explicit goal found, look for user messages with goal keywords
-  if (goalForNext === 'Continue building social confidence') {
-    const userMessages = aiMessages.filter(msg => msg.type === 'user');
-    for (const msg of userMessages.map(m => m.content)) {
-      const lowerMsg = msg.toLowerCase();
-      if (lowerMsg.includes('next time') || lowerMsg.includes('try to') || lowerMsg.includes('want to') || 
-          lowerMsg.includes('will') || lowerMsg.includes('goal') || lowerMsg.includes('plan to')) {
-        goalForNext = msg;
-        break;
-      }
+    
+    // Capitalize first letter
+    cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+    
+    // Limit length
+    if (cleaned.length > 120) {
+      cleaned = cleaned.substring(0, 117) + '...';
     }
+    
+    goalForNext = cleaned;
+    break; // Use the first substantial message
   }
   
-  // Clean up the goal - remove fluff, keep it concise
-  goalForNext = goalForNext.trim();
-  if (goalForNext.toLowerCase().startsWith('i ')) {
-    goalForNext = goalForNext.substring(2); // Remove "I " from start
+  const newReflection = {
+    id: reflections.length + 1,
+    eventName: currentReflection.eventName,
+    date: new Date().toLocaleDateString(),
+    emotion: selectedEmotion.emoji,
+    emotionBg: selectedEmotion.selected.includes('red') ? 'bg-red-100' : 
+              selectedEmotion.selected.includes('green') ? 'bg-green-100' : 'bg-gray-100',
+    emotionBorder: selectedEmotion.selected.includes('red') ? 'border-red-300' : 
+                  selectedEmotion.selected.includes('green') ? 'border-green-300' : 'border-gray-300',
+    snippet: reflectionText.slice(0, 40) + '...',
+    fullReflection: reflectionText,
+    aiHighlights: highlights.length > 0 ? highlights : ['You showed up', 'You participated'],
+    comfortLevel: selectedEmotion.label,
+    goalForNext: goalForNext
+  };
+  
+  setReflections([newReflection, ...reflections]);
+  
+  if (currentReflection.eventId) {
+    setCompletedEventIds([...completedEventIds, currentReflection.eventId]);
   }
-  if (goalForNext.length > 150) {
-    goalForNext = goalForNext.substring(0, 147) + '...';
-  }
-  // Capitalize first letter
-  goalForNext = goalForNext.charAt(0).toUpperCase() + goalForNext.slice(1);
+  
+  setCurrentScreen('home');
+  setCurrentReflection(null);
+};
   
   const newReflection = {
     id: reflections.length + 1,
