@@ -225,12 +225,20 @@ const getNextEvent = () => {
     const [userResponse, setUserResponse] = useState('');
     const [isAITyping, setIsAITyping] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const chatContainerRef = React.useRef(null);
 
     const emotions = [
       { emoji: '😔', label: 'Uncomfortable', bg: 'bg-red-50', border: 'border-red-200', selected: 'bg-red-100 border-red-400' },
       { emoji: '😐', label: 'Neutral', bg: 'bg-gray-50', border: 'border-gray-200', selected: 'bg-indigo-100 border-indigo-400' },
       { emoji: '🙂', label: 'Comfortable', bg: 'bg-green-50', border: 'border-green-200', selected: 'bg-green-100 border-green-400' }
     ];
+
+    // Auto-scroll to bottom when new messages appear
+    React.useEffect(() => {
+      if (chatContainerRef.current) {
+        chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+      }
+    }, [aiMessages, isAITyping]);
 
     const generateAIResponse = async (reflection, emotion, conversationHistory = []) => {
       setIsAITyping(true);
@@ -256,9 +264,11 @@ For FOLLOW-UP responses: If they engage further or give longer answers, you can 
           ? conversationHistory 
           : [{ role: "user", content: systemPrompt }];
 
-        const response = await fetch("/api/chat", {
+        const response = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
-          headers: {"Content-Type": "application/json"},
+          headers: {
+            "Content-Type": "application/json",
+          },
           body: JSON.stringify({
             model: "claude-sonnet-4-20250514",
             max_tokens: 1000,
@@ -316,6 +326,117 @@ For FOLLOW-UP responses: If they engage further or give longer answers, you can 
       setAiMessages(prev => [...prev, { type: 'ai', content: aiResponseText }]);
     };
 
+    // Extract goal from the conversation - prioritize Wabi's suggestions
+    const extractGoalFromConversation = () => {
+      // If there's no meaningful conversation (only error messages), return default
+      const meaningfulMessages = aiMessages.filter(msg => 
+        msg.type === 'ai' && 
+        !msg.content.includes('having trouble connecting') &&
+        msg.content.length > 20
+      );
+      
+      if (meaningfulMessages.length === 0) {
+        return 'Continue building social confidence';
+      }
+
+      // Strategy 1: Look for the last AI message that contains a concrete suggestion
+      // Usually this is after the user has engaged, so it's more specific
+      const aiSuggestions = aiMessages.filter(msg => msg.type === 'ai').reverse();
+      
+      for (const msg of aiSuggestions) {
+        const content = msg.content;
+        
+        // Look for patterns where Wabi suggests a goal
+        const suggestionPatterns = [
+          /how about (trying to |you try to |you )?([^?.!]+[?.!])/i,
+          /you could (try to |try )?([^?.!]+[?.!])/i,
+          /maybe (you could |try to |you can )?([^?.!]+[?.!])/i,
+          /why don't you (try to |try )?([^?.!]+[?.!])/i,
+          /what if you ([^?.!]+[?.!])/i,
+          /your goal.*could be[:\s]+([^?.!]+)/i,
+          /that sounds like a great goal[:\s-]+([^?.!]+)/i,
+          /so (?:your )?goal (?:is|could be) (?:to )?([^?.!]+)/i,
+          /let's (?:make|set) your goal[:\s]+([^?.!]+)/i,
+          /(?:next time|for next time),? (?:you could|maybe) ([^?.!]+)/i,
+        ];
+        
+        for (const pattern of suggestionPatterns) {
+          const match = content.match(pattern);
+          if (match) {
+            let goal = match[match.length - 1].trim();
+            
+            // Remove trailing punctuation
+            goal = goal.replace(/[?.!]+$/, '');
+            
+            // Clean up the goal
+            goal = goal.replace(/^(to |you |will |can |could |would |should )/i, '');
+            goal = goal.trim();
+            goal = goal.charAt(0).toUpperCase() + goal.slice(1);
+            
+            // Limit length
+            if (goal.length > 80) {
+              goal = goal.substring(0, 77) + '...';
+            }
+            
+            if (goal.length > 10) {
+              return goal;
+            }
+          }
+        }
+      }
+      
+      // Strategy 2: If patterns don't match, check if the last AI message itself 
+      // looks like a refined goal (short, actionable statement)
+      const lastAIMessage = aiMessages.filter(msg => msg.type === 'ai').slice(-1)[0];
+      if (lastAIMessage && lastAIMessage.content.length < 100 && lastAIMessage.content.length > 15) {
+        const cleaned = lastAIMessage.content
+          .replace(/[?.!]+$/, '')
+          .replace(/^(okay,? |great!? |perfect!? |sounds good!? )/i, '')
+          .trim();
+        
+        // Check if it doesn't end with a question mark (not a question)
+        if (!lastAIMessage.content.includes('?')) {
+          return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+        }
+      }
+      
+      // Strategy 3: If no clear suggestion found, look for user's stated goal
+      const userMessages = aiMessages.filter(msg => msg.type === 'user');
+      for (const msg of userMessages.reverse()) {
+        const lowerMsg = msg.content.toLowerCase().trim();
+        if (msg.content.length < 15) continue;
+        if (lowerMsg === 'yes' || lowerMsg === 'yeah' || lowerMsg === 'sure' || 
+            lowerMsg === 'okay' || lowerMsg === 'ok' || lowerMsg === 'no') continue;
+        
+        let goal = msg.content.trim();
+        
+        const prefixes = [
+          'i want to ', 'i will ', "i'll ", 'i would like to ',
+          'next time i will ', 'next time i want to ', "next time i'll ",
+          'i think i will ', 'i plan to ', 'maybe i can ', 'i can try to ',
+          'i could ', 'try to ', 'to '
+        ];
+        
+        for (const prefix of prefixes) {
+          if (goal.toLowerCase().startsWith(prefix)) {
+            goal = goal.substring(prefix.length);
+            break;
+          }
+        }
+        
+        goal = goal.charAt(0).toUpperCase() + goal.slice(1);
+        if (goal.length > 80) {
+          goal = goal.substring(0, 77) + '...';
+        }
+        
+        if (goal.length > 10) {
+          return goal;
+        }
+      }
+      
+      return 'Continue building social confidence';
+    };
+
     const saveReflection = () => {
       if (!selectedEmotion) {
         alert('Please select how you felt');
@@ -323,44 +444,21 @@ For FOLLOW-UP responses: If they engage further or give longer answers, you can 
       }
       
       const firstAIMessage = aiMessages.find(msg => msg.type === 'ai')?.content || '';
-      const highlights = firstAIMessage
-        .split('\n')
-        .filter(line => line.trim().length > 0 && !line.includes('?'))
-        .slice(0, 3);
       
-      let goalForNext = 'Continue building social confidence';
-      const userMessages = aiMessages.filter(msg => msg.type === 'user');
+      // Check if the AI response is an error message
+      const isErrorMessage = firstAIMessage.includes('having trouble connecting') || 
+                             firstAIMessage.includes('error') ||
+                             firstAIMessage.length < 20;
       
-      for (const msg of userMessages.map(m => m.content)) {
-        const lowerMsg = msg.toLowerCase().trim();
-        if (msg.length < 15) continue;
-        if (lowerMsg === 'yes' || lowerMsg === 'yeah' || lowerMsg === 'sure' || 
-            lowerMsg === 'okay' || lowerMsg === 'ok' || lowerMsg === 'no') continue;
-        
-        goalForNext = msg;
-        let cleaned = goalForNext.trim();
-        
-        const prefixes = [
-          'i want to ', 'i will ', "i'll ", 'i would like to ',
-          'next time i will ', 'next time i want to ', "next time i'll ",
-          'i think i will ', 'i plan to ', 'maybe i can ', 'i can try to ',
-          'i could ', 'try to '
-        ];
-        
-        for (const prefix of prefixes) {
-          if (cleaned.toLowerCase().startsWith(prefix)) {
-            cleaned = cleaned.substring(prefix.length);
-            break;
-          }
-        }
-        
-        cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
-        if (cleaned.length > 120) {
-          cleaned = cleaned.substring(0, 117) + '...';
-        }
-        goalForNext = cleaned;
-        break;
-      }
+      const highlights = isErrorMessage 
+        ? ['You showed up', 'You engaged with the event', 'You took time to reflect']
+        : firstAIMessage
+            .split('\n')
+            .filter(line => line.trim().length > 0 && !line.includes('?'))
+            .slice(0, 3);
+      
+      // Extract the goal from the conversation (prioritizes Wabi's suggestions)
+      const goalForNext = extractGoalFromConversation();
       
       let emotionBg, emotionBorder;
       if (selectedEmotion.emoji === '😔') {
@@ -455,93 +553,66 @@ For FOLLOW-UP responses: If they engage further or give longer answers, you can 
               <button
                 onClick={handleInitialSubmit}
                 disabled={isSubmitting}
-                className="w-full bg-indigo-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-indigo-700 disabled:bg-indigo-400 disabled:cursor-not-allowed transition-colors shadow-sm"
+                className="w-full bg-indigo-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isSubmitting ? 'Sending to Wabi...' : 'Submit Reflection'}
+                {isSubmitting ? 'Processing...' : 'Continue'}
               </button>
             </>
           ) : (
             <>
               <div className="bg-white rounded-lg p-5 border border-gray-200 shadow-sm">
-                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">
-                  Conversation with Wabi
-                </h3>
-                <div className="space-y-4">
-                  {aiMessages.map((message, index) => (
+                <div 
+                  ref={chatContainerRef}
+                  className="space-y-4 max-h-[60vh] overflow-y-auto scroll-smooth"
+                >
+                  {aiMessages.map((message, idx) => (
                     <div 
-                      key={index} 
-                      className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
-                    >
-                      <div className={`max-w-[85%] px-4 py-3 rounded-lg ${
+                      key={idx} 
+                      className={`${
                         message.type === 'ai' 
-                          ? 'bg-indigo-50 border border-indigo-200' 
-                          : 'bg-gray-100'
-                      }`}>
-                        {message.type === 'ai' && (
-                          <div className="flex items-center mb-2">
-                            <div className="w-6 h-6 bg-indigo-600 rounded-full flex items-center justify-center mr-2">
-                              <span className="text-white text-xs font-bold">W</span>
-                            </div>
-                            <span className="text-indigo-700 font-semibold text-sm">Wabi</span>
-                          </div>
-                        )}
-                        <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-line">
-                          {message.content}
-                        </p>
-                      </div>
+                          ? 'bg-indigo-50 text-gray-800' 
+                          : 'bg-gray-100 text-gray-800 ml-8'
+                      } p-4 rounded-lg`}
+                    >
+                      <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
                     </div>
                   ))}
-                  
                   {isAITyping && (
-                    <div className="flex justify-start">
-                      <div className="px-4 py-3 rounded-lg bg-indigo-50 border border-indigo-200">
-                        <div className="flex items-center mb-2">
-                          <div className="w-6 h-6 bg-indigo-600 rounded-full flex items-center justify-center mr-2">
-                            <span className="text-white text-xs font-bold">W</span>
-                          </div>
-                          <span className="text-indigo-700 font-semibold text-sm">Wabi</span>
-                        </div>
-                        <div className="flex space-x-1">
-                          <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce"></div>
-                          <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
-                          <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
-                        </div>
+                    <div className="bg-indigo-50 p-4 rounded-lg">
+                      <div className="flex space-x-2">
+                        <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce"></div>
+                        <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                        <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
                       </div>
                     </div>
                   )}
                 </div>
               </div>
 
-              {!isAITyping && aiMessages.length > 0 && (
-                <div className="bg-white rounded-lg p-5 border border-gray-200 shadow-sm space-y-3">
-                  <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
-                    Continue the conversation
-                  </h3>
-                  <div className="flex space-x-2">
-                    <input
-                      type="text"
-                      value={userResponse}
-                      onChange={(e) => setUserResponse(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && handleUserResponse()}
-                      className="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                      placeholder="Share your thoughts..."
-                    />
-                    <button
-                      onClick={handleUserResponse}
-                      className="bg-indigo-600 text-white p-3 rounded-lg hover:bg-indigo-700"
-                    >
-                      <Send size={20} />
-                    </button>
-                  </div>
-                  
-                  <button
-                    onClick={saveReflection}
-                    className="w-full bg-green-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-green-700"
-                  >
-                    Save & Return Home
-                  </button>
-                </div>
-              )}
+              <div className="flex space-x-2">
+                <input
+                  type="text"
+                  value={userResponse}
+                  onChange={(e) => setUserResponse(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleUserResponse()}
+                  placeholder="Type your response..."
+                  className="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                />
+                <button
+                  onClick={handleUserResponse}
+                  disabled={isAITyping}
+                  className="bg-indigo-600 text-white p-3 rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Send size={20} />
+                </button>
+              </div>
+
+              <button
+                onClick={saveReflection}
+                className="w-full bg-green-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-green-700"
+              >
+                Save Reflection
+              </button>
             </>
           )}
         </div>
@@ -554,7 +625,7 @@ For FOLLOW-UP responses: If they engage further or give longer answers, you can 
     
     if (!reflection) {
       return (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="min-h-screen bg-gray-50 p-6">
           <p className="text-gray-500">Reflection not found</p>
         </div>
       );
@@ -569,56 +640,47 @@ For FOLLOW-UP responses: If they engage further or give longer answers, you can 
             </button>
             <h1 className="text-xl font-bold">Reflection Details</h1>
           </div>
-          <div>
-            <h2 className="text-lg font-semibold">{reflection.eventName}</h2>
-            <p className="text-indigo-200 text-sm">{reflection.date}</p>
+          <div className="flex justify-between items-start">
+            <div>
+              <h2 className="text-lg font-semibold">{reflection.eventName}</h2>
+              <p className="text-indigo-200 text-sm">{reflection.date}</p>
+            </div>
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${reflection.emotionBg} ${reflection.emotionBorder} border-2`}>
+              <span className="text-2xl">{reflection.emotion}</span>
+            </div>
           </div>
         </div>
 
-        <div className="px-6 py-6 space-y-6">
+        <div className="px-6 py-6 space-y-5">
           <div className="bg-white rounded-lg p-5 border border-gray-200 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-semibold text-gray-800">How You Felt</h3>
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center ${reflection.emotionBg} border-2 ${reflection.emotionBorder}`}>
-                <span className="text-2xl">{reflection.emotion}</span>
-              </div>
-            </div>
-            <p className="text-gray-600 font-medium">{reflection.comfortLevel}</p>
+            <h3 className="text-sm font-semibold text-gray-500 uppercase mb-3">Your Reflection</h3>
+            <p className="text-gray-800">{reflection.fullReflection}</p>
           </div>
 
           <div className="bg-white rounded-lg p-5 border border-gray-200 shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-800 mb-3">Your Reflection</h3>
-            <div className="bg-gray-50 p-4 rounded-lg border-l-4 border-gray-300">
-              <p className="text-gray-700 italic">"{reflection.fullReflection}"</p>
-            </div>
+            <h3 className="text-sm font-semibold text-gray-500 uppercase mb-3">Comfort Level</h3>
+            <p className="text-gray-800 font-medium">{reflection.comfortLevel}</p>
           </div>
 
-          <div className="bg-indigo-50 rounded-lg p-5 border border-indigo-200 shadow-sm">
-            <div className="flex items-center mb-3">
-              <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center mr-3">
-                <span className="text-white text-sm font-bold">W</span>
-              </div>
-              <h3 className="text-lg font-semibold text-indigo-800">Wabi's Insights</h3>
-            </div>
-            <div className="space-y-2">
-              {reflection.aiHighlights.map((highlight, index) => (
-                <div key={index} className="flex items-start">
-                  <span className="text-indigo-500 mr-2">✨</span>
-                  <p className="text-indigo-700">{highlight}</p>
-                </div>
+          <div className="bg-white rounded-lg p-5 border border-gray-200 shadow-sm">
+            <h3 className="text-sm font-semibold text-gray-500 uppercase mb-3">Highlights</h3>
+            <ul className="space-y-2">
+              {reflection.aiHighlights.map((highlight, idx) => (
+                <li key={idx} className="flex items-start">
+                  <span className="text-green-500 mr-2">✓</span>
+                  <span className="text-gray-800">{highlight}</span>
+                </li>
               ))}
-            </div>
+            </ul>
           </div>
 
-          {reflection.goalForNext && (
-            <div className="bg-green-50 rounded-lg p-5 border border-green-200 shadow-sm">
-              <div className="flex items-center mb-2">
-                <Target size={20} className="text-green-600 mr-2" />
-                <h3 className="text-lg font-semibold text-green-800">Goal for Next Time</h3>
-              </div>
-              <p className="text-green-700">{reflection.goalForNext}</p>
-            </div>
-          )}
+          <div className="bg-indigo-50 rounded-lg p-5 border-2 border-indigo-200 shadow-sm">
+            <h3 className="text-sm font-semibold text-indigo-700 uppercase mb-3 flex items-center">
+              <Target size={16} className="mr-2" />
+              Goal for Next Time
+            </h3>
+            <p className="text-indigo-900 font-medium">{reflection.goalForNext}</p>
+          </div>
         </div>
       </div>
     );
@@ -826,9 +888,9 @@ For FOLLOW-UP responses: If they engage further or give longer answers, you can 
   return (
     <div className="max-w-md mx-auto bg-white min-h-screen">
       {renderScreen()}
-      {
-        (currentScreen === 'home' || currentScreen === 'events') && <TabNavigation activeTab={currentScreen} onTabChange={setCurrentScreen} />}
-</div>
-);
+      {(currentScreen === 'home' || currentScreen === 'events') && <TabNavigation activeTab={currentScreen} onTabChange={setCurrentScreen} />}
+    </div>
+  );
 }
+
 export default App;
