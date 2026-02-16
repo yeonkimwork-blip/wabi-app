@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Home, Calendar, ArrowLeft, Plus, Clock, MapPin, Target, ChevronRight, Send, Eye } from 'lucide-react';
+import { Home, Calendar, ArrowLeft, Plus, Clock, MapPin, Target, ChevronRight, Send, Eye, Trophy } from 'lucide-react';
 
 function App() {
   const [currentScreen, setCurrentScreen] = useState('home');
@@ -125,6 +125,15 @@ const getNextEvent = () => {
         >
           <Calendar size={20} fill={activeTab === 'events' ? 'currentColor' : 'none'} className="mb-1" />
           <span className="text-xs font-medium">Events</span>
+        </button>
+        <button 
+          onClick={() => onTabChange('wins')} 
+          className={`flex-1 flex flex-col items-center py-2 px-3 rounded-lg ${
+            activeTab === 'wins' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-400'
+          }`}
+        >
+          <Trophy size={20} fill={activeTab === 'wins' ? 'currentColor' : 'none'} className="mb-1" />
+          <span className="text-xs font-medium">Wins</span>
         </button>
       </div>
     </div>
@@ -684,6 +693,125 @@ For FOLLOW-UP responses: If they engage further or give longer answers, you can 
     );
   };
 
+  const WinsScreen = () => {
+    // Calculate stats
+    const goalsCompleted = reflections.length;
+    const eventsAttended = completedEventIds.length;
+    
+    // Calculate current streak (consecutive days with reflections)
+    const calculateStreak = () => {
+      if (reflections.length === 0) return 0;
+      
+      const sortedReflections = [...reflections].sort((a, b) => {
+        const dateA = new Date(a.date);
+        const dateB = new Date(b.date);
+        return dateB - dateA; // Most recent first
+      });
+      
+      let streak = 0;
+      let currentDate = new Date();
+      currentDate.setHours(0, 0, 0, 0);
+      
+      for (const reflection of sortedReflections) {
+        const reflectionDate = new Date(reflection.date);
+        reflectionDate.setHours(0, 0, 0, 0);
+        
+        const daysDiff = Math.floor((currentDate - reflectionDate) / (1000 * 60 * 60 * 24));
+        
+        if (daysDiff === streak) {
+          streak++;
+        } else if (daysDiff > streak) {
+          break;
+        }
+      }
+      
+      return streak;
+    };
+    
+    const currentStreak = calculateStreak();
+    
+    // Format time ago
+    const getTimeAgo = (dateString) => {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffMs = now - date;
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      
+      if (diffDays === 0) return 'Today';
+      if (diffDays === 1) return 'Yesterday';
+      if (diffDays < 7) return `${diffDays} days ago`;
+      if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    };
+
+    return (
+      <div className="min-h-screen bg-gray-50 pb-20">
+        <div className="bg-white px-6 py-8">
+          <h1 className="text-2xl font-bold text-gray-700 mb-2">Your Wins</h1>
+          <p className="text-gray-500 mb-8">Celebrate every step forward</p>
+          
+          {/* Stats Grid */}
+          <div className="grid grid-cols-2 gap-4 mb-8">
+            <div className="bg-white border-2 border-gray-200 rounded-xl p-6 text-center">
+              <div className="text-4xl font-bold text-green-600 mb-2">{goalsCompleted}</div>
+              <div className="text-sm text-gray-600">Goals Completed</div>
+            </div>
+            
+            <div className="bg-white border-2 border-gray-200 rounded-xl p-6 text-center">
+              <div className="text-4xl font-bold text-green-600 mb-2">{eventsAttended}</div>
+              <div className="text-sm text-gray-600">Events Attended</div>
+            </div>
+            
+            <div className="bg-white border-2 border-gray-200 rounded-xl p-6 text-center col-span-2">
+              <div className="text-4xl font-bold text-green-600 mb-2">🔥 {currentStreak}</div>
+              <div className="text-sm text-gray-600">Day Streak</div>
+            </div>
+          </div>
+
+          {/* Recent Wins */}
+          <div>
+            <h2 className="text-lg font-semibold text-gray-700 mb-4">Recent Wins</h2>
+            
+            {reflections.length === 0 ? (
+              <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                <Trophy size={48} className="mx-auto text-gray-400 mb-3" />
+                <p className="text-gray-500">No wins yet! Complete your first reflection to see your progress here.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {reflections.map((reflection) => (
+                  <div 
+                    key={reflection.id}
+                    onClick={() => {
+                      setSelectedReflectionId(reflection.id);
+                      setCurrentScreen('viewReflection');
+                    }}
+                    className="bg-white border border-gray-200 rounded-lg p-4 flex items-center cursor-pointer hover:shadow-md transition-shadow"
+                  >
+                    <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mr-4 flex-shrink-0">
+                      <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-gray-800 line-clamp-1">{reflection.goalForNext}</p>
+                      <p className="text-sm text-gray-500">
+                        {reflection.eventName} · {getTimeAgo(reflection.date)}
+                      </p>
+                    </div>
+                    
+                    <ChevronRight size={20} className="text-gray-400 flex-shrink-0" />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const EventsScreen = () => (
     <div className="min-h-screen bg-gray-50 pb-20">
       <div className="bg-white px-6 py-8">
@@ -877,6 +1005,7 @@ For FOLLOW-UP responses: If they engage further or give longer answers, you can 
     switch (currentScreen) {
       case 'reflection': return <ReflectionScreen />;
       case 'events': return <EventsScreen />;
+      case 'wins': return <WinsScreen />;
       case 'addEvent': return <AddEventScreen />;
       case 'viewReflection': return <ViewReflectionScreen />;
       default: return <HomeScreen />;
@@ -886,7 +1015,7 @@ For FOLLOW-UP responses: If they engage further or give longer answers, you can 
   return (
     <div className="max-w-md mx-auto bg-white min-h-screen">
       {renderScreen()}
-      {(currentScreen === 'home' || currentScreen === 'events') && <TabNavigation activeTab={currentScreen} onTabChange={setCurrentScreen} />}
+      {(currentScreen === 'home' || currentScreen === 'events' || currentScreen === 'wins') && <TabNavigation activeTab={currentScreen} onTabChange={setCurrentScreen} />}
     </div>
   );
 }
